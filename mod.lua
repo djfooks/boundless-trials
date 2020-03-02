@@ -79,14 +79,42 @@ function spawnPlatform(bx, by, bz, blockType, color)
     end
 end
 
+local signDir = {
+    { dirX=1, dirZ=0, placeOnFace=4 },
+    { dirX=0, dirZ=1, placeOnFace=2 },
+    { dirX=1, dirZ=0, placeOnFace=5 },
+    { dirX=0, dirZ=1, placeOnFace=3 }
+}
+function addSign(p, dir, halfWidth, height, text)
+    local b = boundless.undescribeBlock({
+        blockType=boundless.blockTypes.SIGN_STONE_MODULAR,
+        placeOnFace=signDir[dir].placeOnFace,
+        rotation=0,
+        blockColorIndex=10
+    })
+    local pos
+    for i=-halfWidth,halfWidth do
+        for y=1,height do
+            local s = boundless.wrap(p + boundless.UnwrappedBlockDelta(i * signDir[dir].dirX, y - 1, i * signDir[dir].dirZ))
+            pos = pos or s
+            boundless.setBlockValues(s, b)
+        end
+    end
+    local signEntity = boundless.getEntity(pos)
+    if signEntity and signEntity.textAlign ~= nil then -- testing for textAlign field is sufficient to check if a sign entity
+        signEntity.text = text
+    end
+end
+
 local trailsOffsetX = 100
 local trialsSectionX = 105
-local sectionSizeZ = 10
-local sectionDepth = 100
-function addSection(name, offsetZ)
+local sectionSizeZ = 8
+local sectionDepth = 30
+function addSection(name, levels, offsetZ)
     -- floor
     for x = trailsOffsetX, trialsSectionX + sectionDepth do
         for z = offsetZ, offsetZ + sectionSizeZ do
+            -- floor
             if x % 4 == 2 and z % 4 == 2 then
                 setBlockXYZ(x, 128, z, boundless.blockTypes.CRYSTAL_GLEAM_BASE, 228)
             else
@@ -96,6 +124,7 @@ function addSection(name, offsetZ)
                     setBlockXYZ(x, 128, z, boundless.blockTypes.WOOD_ANCIENT_TIMBER, 0)
                 end
             end
+            -- roof
             if x >= trialsSectionX then
                 if x % 2 == 1 and z % 2 == 1 then
                     setBlockXYZ(x, 132, z, boundless.blockTypes.WOOD_ANCIENT_TIMBER, 0)
@@ -119,20 +148,40 @@ function addSection(name, offsetZ)
         end
     end
 
+    local signP = boundless.wrap(boundless.UnwrappedBlockCoord(trialsSectionX - 1, 132, offsetZ + sectionSizeZ * 0.5))
+    addSign(signP, 2, 3, 1, name)
 end
 
 function spawnTrials()
     local sections = {
-        "CHALLENGES",
-        "MINING",
-        "FIGHTING",
-        "TRADING",
-        "ASSAULT COURSES"
+        MINING={
+            {
+                name="Rock race",
+                description="Smash through the rocks to beat the timer",
+                resources={ boundless.blockTypes.ROCK_METAMORPHIC_BASE_DUGUP },
+                reward={ boundless.itemTypes.ROCK_BOULDER_DUGUP },
+                stars_required=0,
+                star_1_time=30,
+                star_2_time=25,
+                star_3_time=20
+            }
+        },
+        CHALLENGES={},
+        FIGHTING={},
+        TRADING={},
+        ASSAULT_COURSES={}
     }
 
+    local numSections = 0
+    for key, value in pairs(sections) do
+        numSections = numSections + 1
+    end
+
     local startZ = 4 - #sections * sectionSizeZ * 0.5
-    for i=1, #sections do
-        addSection(sections[i], startZ + (i - 1) * sectionSizeZ)
+    local i = 0
+    for key, value in pairs(sections) do
+        addSection(key, value, startZ + (i - 1) * sectionSizeZ)
+        i = i + 1
     end
 end
 
