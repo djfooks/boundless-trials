@@ -79,7 +79,61 @@ function spawnPlatform(bx, by, bz, blockType, color)
     end
 end
 
+local trailsOffsetX = 100
+local trialsSectionX = 105
+local sectionSizeZ = 10
+local sectionDepth = 100
+function addSection(name, offsetZ)
+    -- floor
+    for x = trailsOffsetX, trialsSectionX + sectionDepth do
+        for z = offsetZ, offsetZ + sectionSizeZ do
+            if x % 4 == 2 and z % 4 == 2 then
+                setBlockXYZ(x, 128, z, boundless.blockTypes.CRYSTAL_GLEAM_BASE, 228)
+            else
+                if x % 2 == 1 and z % 2 == 1 then
+                    setBlockXYZ(x, 128, z, boundless.blockTypes.WOOD_TWISTED_TIMBER, 0)
+                else
+                    setBlockXYZ(x, 128, z, boundless.blockTypes.WOOD_ANCIENT_TIMBER, 0)
+                end
+            end
+            if x >= trialsSectionX then
+                if x % 2 == 1 and z % 2 == 1 then
+                    setBlockXYZ(x, 132, z, boundless.blockTypes.WOOD_ANCIENT_TIMBER, 0)
+                else
+                    setBlockXYZ(x, 132, z, boundless.blockTypes.WOOD_TWISTED_TIMBER, 0)
+                end
+            end
+        end
+    end
+
+    for x = trialsSectionX, trialsSectionX + sectionDepth do
+        for y = 128, 131 do
+            local blockType = boundless.blockTypes.WOOD_ANCIENT_TRUNK
+            if x % 2 == 0 then
+                blockType = boundless.blockTypes.WOOD_TWISTED_TRUNK
+            end
+            -- left wall
+            setBlockXYZ(x, y, offsetZ, blockType, 0)
+            -- right wall
+            setBlockXYZ(x, y, offsetZ + sectionSizeZ, blockType, 0)
+        end
+    end
+
+end
+
 function spawnTrials()
+    local sections = {
+        "CHALLENGES",
+        "MINING",
+        "FIGHTING",
+        "TRADING",
+        "ASSAULT COURSES"
+    }
+
+    local startZ = 4 - #sections * sectionSizeZ * 0.5
+    for i=1, #sections do
+        addSection(sections[i], startZ + (i - 1) * sectionSizeZ)
+    end
 end
 
 spawnPlatform(40, 128, 4, boundless.blockTypes.ROCK_METAMORPHIC_BASE_DUGUP, 0)
@@ -89,7 +143,7 @@ local chest1Entity = boundless.getEntity(chest1Pos)
 chest1Entity.inventory[1][1] = boundless.Item(boundless.itemTypes.PLACEABLE_WATER, 1, 0)
 chest1Entity.inventory[1][2] = boundless.Item(boundless.itemTypes.PLACEABLE_LAVA, 1, 0)
 
--- spawnTrials()
+spawnTrials()
 
 local tips = {
     { name="Make a tree",     description="Try jumping on a soil block!" },
