@@ -1,27 +1,15 @@
 
-function getMapFromCountedMap(map, key)
-    local element = map.map[key]
+function getMapFromMap(map, key)
+    local element = map[key]
     if element == nil then
-        map.count = map.count + 1
-        element = { count=0, map={} }
-        map.map[key] = element
+        element = {}
+        map[key] = element
         return element
     end
     return element
 end
 
-function setValueCountedMap(map, key, value)
-    local element = map.map[key]
-    if element == nil then
-        map.count = map.count + 1
-        map.map[key] = value
-        return true
-    end
-    map.map[key] = value
-    return false
-end
-
-local batchChunks = { count=0, map={} }
+local batchChunks = {}
 local batchBlocksCount = 0
 
 function addBatchBlock(p, blockType)
@@ -29,11 +17,12 @@ function addBatchBlock(p, blockType)
     local localBlockCoord = boundless.wrap(p - boundless.BlockCoord(chunkCoord))
     local blockIndex = localBlockCoord.x + localBlockCoord.z * 16 + localBlockCoord.y * 256
 
-    local chunksZ = getMapFromCountedMap(batchChunks, chunkCoord.x)
-    local blocksMap = getMapFromCountedMap(chunksZ, chunkCoord.z)
-    if setValueCountedMap(blocksMap, blockIndex, blockType) then
+    local chunksZ = getMapFromMap(batchChunks, chunkCoord.x)
+    local blocksMap = getMapFromMap(chunksZ, chunkCoord.z)
+    if blocksMap[blockIndex] == nil then
         batchBlocksCount = batchBlocksCount + 1
     end
+    blocksMap[blockIndex] = blockType
 end
 
 function makeCube()
@@ -48,19 +37,9 @@ function makeCube()
 
     local p = boundless.wrap(playerBlockCoord + boundless.UnwrappedBlockDelta(10, 10, 10))
     for x=-16,16 do
-        for y=0,0 do
-            for z=-0,0 do
+        for y=0,16 do
+            for z=-0,16 do
                 addBatchBlock(boundless.wrap(p + boundless.UnwrappedBlockDelta(x, y, z)), boundless.blockTypes.WOOD_ANCIENT_TRUNK)
-            end
-        end
-    end
-
-    for x, chunksZ in pairs(batchChunks.map) do
-        print("x " .. x)
-        for z, blocksMap in pairs(chunksZ.map) do
-            print("    z " .. z)
-            for blockId, blockType in pairs(blocksMap.map) do
-                print("        (" .. x .. ", " .. z .. ") blockId " .. blockId)
             end
         end
     end
@@ -76,8 +55,8 @@ function setBatch()
     local blocksSet = 0
     c = coroutine.create(function()
         function peekChunk()
-            for chunkX, chunksZMap in pairs(batchChunks.map) do
-                for chunkZ, blocksMap in pairs(chunksZMap.map) do
+            for chunkX, chunksZMap in pairs(batchChunks) do
+                for chunkZ, blocksMap in pairs(chunksZMap) do
                     return boundless.wrap(boundless.UnwrappedChunkCoord(chunkX, chunkZ))
                 end
             end
@@ -85,7 +64,7 @@ function setBatch()
         end
 
         function peekBlock(blockMap)
-            for blockId, blockType in pairs(blockMap.map) do
+            for blockId, blockType in pairs(blockMap) do
                 return { blockId, blockType }
             end
             return nil
@@ -100,49 +79,44 @@ function setBatch()
         end
 
         local loadedChunks = {}
+        local loadingChunks = false
         while true do
+            --print("loopin")
             local chunkCoord = peekChunk()
             if chunkCoord == nil then
+                batchChunks = {}
                 return
             end
             local chunkLocal = boundless.BlockCoord(chunkCoord)
 
             if #loadedChunks == 9 then
-                print("loadedChunks " .. chunkCoord.x .. " " .. chunkCoord.z)
-                local blockMap = batchChunks.map[chunkCoord.x].map[chunkCoord.z]
-                local allSet = false
-                for i=1,16 do
-                    v = peekBlock(blockMap)
-                    print("peek block " .. v[1] .. " " .. v[2])
-                    if v == nil then
-                        allSet = true
-                        break
+                local blockMap = batchChunks[chunkCoord.x][chunkCoord.z]
+
+                v = peekBlock(blockMap)
+                if v == nil then
+                    batchChunks[chunkCoord.x][chunkCoord.z] = nil
+                    for _, loadedChunk in ipairs(loadedChunks) do
+                        loadedChunk:release()
                     end
+                    loadedChunks = {}
+                    print("released chunks")
+                else
                     local blockId = v[1]
                     local blockPos = toBlockPos(chunkLocal, blockId)
                     local blockType = v[2]
                     local blockValues = boundless.BlockValues(blockType, 0, 0, 0)
                     boundless.setBlockValues(blockPos, blockValues)
                     blocksSet = blocksSet + 1
-
-                    blockMap.map[blockId] = nil
-                    blockMap.count = blockMap.count - 1
+                    blockMap[blockId] = nil
                 end
-
-                if allSet then
-                    removeFromChunkMap(chunkCoord)
-                    for _, loadedChunk in ipairs(loadedChunks) do
-                        loadedChunk:release()
-                    end
-                    loadedChunks = {}
-                else
-                    coroutine.yield()
-                end
-            else
+            elseif loadingChunks == false then
+                loadingChunks = true
                 boundless.loadChunkAnd8Neighbours(chunkCoord, function (chunks)
                     for i, chunk in ipairs(chunks) do
                         loadedChunks[i] = chunk:lock()
                     end
+                    print("Loaded chunks " .. #loadedChunks)
+                    loadingChunks = false
                 end)
             end
             coroutine.yield()
@@ -152,12 +126,12 @@ function setBatch()
     local id;
     id = os.setInterval(function()
         if coroutine.resume(c) then
-            print("Blocks set " .. blocksSet .. " / " .. batchBlocksCount)
+            --print("Blocks set " .. blocksSet .. " / " .. batchBlocksCount)
         else
             print("batch done!")
             os.clearInterval(id)
         end
-    end, 20)
+    end, 1)
 end
 
 
