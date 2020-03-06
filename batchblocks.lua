@@ -69,13 +69,15 @@ end
 makeCube()
 
 
+boundless.wrap(boundless.UnwrappedChunkCoord(0, 0))
+
 function setBatch()
     local c;
     local blocksSet = 0
     c = coroutine.create(function()
         function peekChunk()
-            for chunkX, chunksZMap in pairs(batchChunks) do
-                for chunkZ, blocksMap in pairs(chunksZMap) do
+            for chunkX, chunksZMap in pairs(batchChunks.map) do
+                for chunkZ, blocksMap in pairs(chunksZMap.map) do
                     return boundless.wrap(boundless.UnwrappedChunkCoord(chunkX, chunkZ))
                 end
             end
@@ -94,7 +96,7 @@ function setBatch()
             blockId = blockId - blockY * 256
             local blockZ = math.floor(blockId / 16)
             local blockX = blockId - blockZ * 16
-            return boundless.wrap(chunkLocal + boundless.UnwrappedBlockCoord(blockX, blockY, blockZ))
+            return boundless.wrap(chunkLocal + boundless.UnwrappedBlockDelta(blockX, blockY, blockZ))
         end
 
         local loadedChunks = {}
@@ -106,10 +108,12 @@ function setBatch()
             local chunkLocal = boundless.BlockCoord(chunkCoord)
 
             if #loadedChunks == 9 then
-                local blockMap = batchChunks[chunkCoord.x][chunkCoord.z]
+                print("loadedChunks " .. chunkCoord.x .. " " .. chunkCoord.z)
+                local blockMap = batchChunks.map[chunkCoord.x].map[chunkCoord.z]
                 local allSet = false
                 for i=1,16 do
                     v = peekBlock(blockMap)
+                    print("peek block " .. v[1] .. " " .. v[2])
                     if v == nil then
                         allSet = true
                         break
@@ -127,7 +131,7 @@ function setBatch()
 
                 if allSet then
                     removeFromChunkMap(chunkCoord)
-                    for _, loadedChunk in ipair(loadedChunks) do
+                    for _, loadedChunk in ipairs(loadedChunks) do
                         loadedChunk:release()
                     end
                     loadedChunks = {}
@@ -136,7 +140,7 @@ function setBatch()
                 end
             else
                 boundless.loadChunkAnd8Neighbours(chunkCoord, function (chunks)
-                    for i, chunk in ipair(chunks) do
+                    for i, chunk in ipairs(chunks) do
                         loadedChunks[i] = chunk:lock()
                     end
                 end)
