@@ -12,7 +12,7 @@ end
 local batchChunks = {}
 local batchBlocksCount = 0
 
-function addBatchBlock(p, blockType)
+function addBatchBlock(p, blockValues)
     local chunkCoord = boundless.ChunkCoord(p)
     local localBlockCoord = boundless.wrap(p - boundless.BlockCoord(chunkCoord))
     local blockIndex = localBlockCoord.x + localBlockCoord.z * 16 + localBlockCoord.y * 256
@@ -22,38 +22,52 @@ function addBatchBlock(p, blockType)
     if blocksMap[blockIndex] == nil then
         batchBlocksCount = batchBlocksCount + 1
     end
-    blocksMap[blockIndex] = blockType
+    blocksMap[blockIndex] = blockValues
 end
 
-function makeCube()
-    local player
-    for c in boundless.connections() do
-        local e = boundless.getEntity(c.id)
-        if e then
-            player = e
-        end
-    end
-    local playerBlockCoord = boundless.BlockCoord(player.position)
+function addBatchBlockXYZ(x, y, z, blockValues)
+    local p = boundless.wrap(boundless.UnwrappedBlockCoord(x, y, z))
+    return addBatchBlock(p, blockValues)
+end
 
-    local p = boundless.wrap(playerBlockCoord + boundless.UnwrappedBlockDelta(10, 10, 10))
-    for x=-16,16 do
-        for y=0,16 do
-            for z=-0,16 do
-                addBatchBlock(boundless.wrap(p + boundless.UnwrappedBlockDelta(x, y, z)), boundless.blockTypes.WOOD_ANCIENT_TRUNK)
+function yieldWrapper(workFn, interval, completeFn)
+    local c;
+    c = coroutine.create(function()
+        workFn()
+    end)
+    local id;
+    id = os.setInterval(function()
+        if coroutine.resume(c) then
+        else
+            c = nil
+            os.clearInterval(id)
+            if completeFn ~= nil then
+                completeFn()
             end
         end
-    end
+    end, interval)
 end
 
-makeCube()
-
-
-boundless.wrap(boundless.UnwrappedChunkCoord(0, 0))
+function yieldWaterfall(fnArray, completeFn)
+    local i = 1
+    function runNextFn()
+        if i == #fnArray then
+            if completeFn ~= nil then
+                completeFn()
+            end
+        else
+            yieldWrapper(fnArray[i], 1, runNextFn)
+            fnArray[i] = nil
+            i = i + 1
+        end
+    end
+    runNextFn()
+end
 
 function setBatch()
-    local c;
+    print("setBatch")
     local blocksSet = 0
-    c = coroutine.create(function()
+    function workFn()
         function peekChunk()
             for chunkX, chunksZMap in pairs(batchChunks) do
                 for chunkZ, blocksMap in pairs(chunksZMap) do
@@ -80,38 +94,47 @@ function setBatch()
 
         local loadedChunks = {}
         local loadingChunks = false
+        local currentChunk = nil
+        local chunkLocal = nil
+        local blockMap = nil
         while true do
             --print("loopin")
-            local chunkCoord = peekChunk()
-            if chunkCoord == nil then
-                batchChunks = {}
-                return
+            if currentChunk == nil then
+                currentChunk = peekChunk()
+                if currentChunk == nil then
+                    batchChunks = {}
+                    return
+                end
+                chunkLocal = boundless.BlockCoord(currentChunk)
+                blockMap = batchChunks[currentChunk.x][currentChunk.z]
             end
-            local chunkLocal = boundless.BlockCoord(chunkCoord)
 
             if #loadedChunks == 9 then
-                local blockMap = batchChunks[chunkCoord.x][chunkCoord.z]
-
-                v = peekBlock(blockMap)
-                if v == nil then
-                    batchChunks[chunkCoord.x][chunkCoord.z] = nil
-                    for _, loadedChunk in ipairs(loadedChunks) do
-                        loadedChunk:release()
+                for i=0,1023 do
+                    if currentChunk then
+                        v = peekBlock(blockMap)
+                        if v == nil then
+                            batchChunks[currentChunk.x][currentChunk.z] = nil
+                            for _, loadedChunk in ipairs(loadedChunks) do
+                                loadedChunk:release()
+                            end
+                            loadedChunks = {}
+                            print("released chunks")
+                            currentChunk = nil
+                        else
+                            local blockId = v[1]
+                            local blockPos = toBlockPos(chunkLocal, blockId)
+                            local blockValues = v[2]
+                            boundless.setBlockValues(blockPos, blockValues)
+                            blocksSet = blocksSet + 1
+                            blockMap[blockId] = nil
+                        end
                     end
-                    loadedChunks = {}
-                    print("released chunks")
-                else
-                    local blockId = v[1]
-                    local blockPos = toBlockPos(chunkLocal, blockId)
-                    local blockType = v[2]
-                    local blockValues = boundless.BlockValues(blockType, 0, 0, 0)
-                    boundless.setBlockValues(blockPos, blockValues)
-                    blocksSet = blocksSet + 1
-                    blockMap[blockId] = nil
                 end
+
             elseif loadingChunks == false then
                 loadingChunks = true
-                boundless.loadChunkAnd8Neighbours(chunkCoord, function (chunks)
+                boundless.loadChunkAnd8Neighbours(currentChunk, function (chunks)
                     for i, chunk in ipairs(chunks) do
                         loadedChunks[i] = chunk:lock()
                     end
@@ -121,18 +144,37 @@ function setBatch()
             end
             coroutine.yield()
         end
-    end)
+    end
 
-    local id;
-    id = os.setInterval(function()
-        if coroutine.resume(c) then
-            --print("Blocks set " .. blocksSet .. " / " .. batchBlocksCount)
-        else
-            print("batch done!")
-            os.clearInterval(id)
-        end
-    end, 1)
+    yieldWrapper(workFn, 1, function()
+        print("batch done!")
+    end)
 end
 
+function testBatchBlocks()
+    function makeCube()
+        local player
+        for c in boundless.connections() do
+            local e = boundless.getEntity(c.id)
+            if e then
+                player = e
+            end
+        end
+        local playerBlockCoord = boundless.BlockCoord(player.position)
 
-setBatch()
+        local p = boundless.wrap(playerBlockCoord + boundless.UnwrappedBlockDelta(10, 10, 10))
+
+        local blockValues = boundless.BlockValues(boundless.blockTypes.WOOD_ANCIENT_TRUNK, 0, 0, 0)
+        for x=-16,16 do
+            for y=0,16 do
+                for z=-0,16 do
+                    addBatchBlock(boundless.wrap(p + boundless.UnwrappedBlockDelta(x, y, z)), blockValues)
+                end
+            end
+            coroutine.yield()
+        end
+    end
+    yieldWrapper(makeCube, 1, setBatch)
+end
+
+--testBatchBlocks()
