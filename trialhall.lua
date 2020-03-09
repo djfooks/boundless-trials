@@ -126,7 +126,12 @@ end
 function getTrialDescriptionText(trial, active)
     if stars >= trial.stars_required then
         if active then
-            return trial.description .. "\nJUMP TO PLAY"
+            local now = os.hrtime()
+            if now % 1 < 0.5 then
+                return trial.description .. "\nJUMP TO PLAY"
+            else
+                return trial.description .. "\n--> JUMP TO PLAY <--"
+            end
         else
             return trial.description
         end
@@ -158,8 +163,8 @@ function updateTrialHall(posUnderFeet)
         local section = trialHall[sectionId]
         local trial = section.trials[trialId]
         if trial ~= nil then
+            updateTrialHallSigns(trial, true)
             if prevTrial ~= trial then
-                updateTrialHallSigns(trial, true)
                 if prevTrial ~= nil then
                     updateTrialHallSigns(prevTrial, false)
                 end

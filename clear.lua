@@ -25,6 +25,7 @@ end
 
 function workFn()
     clearCubeXYZ(0, 127, -32, 120, 140, 32)
+    clearCubeXYZ(299, 5, 299, 331, 30, 351)
     print("Clear cube setup")
 end
 
