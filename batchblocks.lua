@@ -64,7 +64,7 @@ function yieldWaterfall(fnArray, completeFn)
     runNextFn()
 end
 
-function setBatch()
+function setBatch(completeFn)
     print("setBatch")
     local blocksSet = 0
     function workFn()
@@ -148,6 +148,9 @@ function setBatch()
 
     yieldWrapper(workFn, 1, function()
         print("batch done!")
+        if completeFn ~= nil then
+            completeFn()
+        end
     end)
 end
 
