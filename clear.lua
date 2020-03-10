@@ -29,4 +29,6 @@ function workFn()
     print("Clear cube setup")
 end
 
-yieldWrapper(workFn, 1, setBatch)
+function clearTrials()
+    yieldWrapper(workFn, 1, setBatch)
+end

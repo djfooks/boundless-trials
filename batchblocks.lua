@@ -37,8 +37,15 @@ function yieldWrapper(workFn, interval, completeFn)
     end)
     local id;
     id = os.setInterval(function()
-        if coroutine.resume(c) then
-        else
+        if coroutine.status(c) == "suspended" then
+            local ok, errorMsg = coroutine.resume(c)
+            if ok then
+            else
+                c = nil
+                os.clearInterval(id)
+                print("ERROR: " .. errorMsg)
+            end
+        elseif coroutine.status(c) == "dead" then
             c = nil
             os.clearInterval(id)
             if completeFn ~= nil then
@@ -119,7 +126,7 @@ function setBatch(completeFn)
                                 loadedChunk:release()
                             end
                             loadedChunks = {}
-                            print("released chunks")
+                            -- print("released chunks")
                             currentChunk = nil
                         else
                             local blockId = v[1]
@@ -138,7 +145,7 @@ function setBatch(completeFn)
                     for i, chunk in ipairs(chunks) do
                         loadedChunks[i] = chunk:lock()
                     end
-                    print("Loaded chunks " .. #loadedChunks)
+                    -- print("Loaded chunks " .. #loadedChunks)
                     loadingChunks = false
                 end)
             end

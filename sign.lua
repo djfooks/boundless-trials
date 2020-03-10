@@ -26,6 +26,7 @@ function addSign(p, dir, width, height, text)
     if signEntity and signEntity.textAlign ~= nil then -- testing for textAlign field is sufficient to check if a sign entity
         signEntity.text = text
     end
+    return pos
 end
 
 function signTest()
