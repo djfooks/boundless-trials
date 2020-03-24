@@ -11,6 +11,7 @@ end
 
 local batchChunks = {}
 local batchBlocksCount = 0
+local postFns = {}
 
 function addBatchBlock(p, blockValues)
     local chunkCoord = boundless.ChunkCoord(p)
@@ -28,6 +29,10 @@ end
 function addBatchBlockXYZ(x, y, z, blockValues)
     local p = boundless.wrap(boundless.UnwrappedBlockCoord(x, y, z))
     return addBatchBlock(p, blockValues)
+end
+
+function addPostFunction(fn)
+    table.insert(postFns, fn)
 end
 
 function yieldWrapper(workFn, interval, completeFn)
@@ -110,6 +115,12 @@ function setBatch(completeFn)
                 currentChunk = peekChunk()
                 if currentChunk == nil then
                     batchChunks = {}
+                    print("Post functions...")
+                    for i,fn in ipairs(postFns) do
+                        fn()
+                        coroutine.yield()
+                    end
+                    print("Post functions complete")
                     return
                 end
                 chunkLocal = boundless.BlockCoord(currentChunk)

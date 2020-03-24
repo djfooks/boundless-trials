@@ -1,4 +1,6 @@
-require "trials/batchblocks"
+require "trials/scripthelpers"
+
+scriptRequire("trials/batchblocks")
 
 function clearCubeXYZ(x0, y0, z0, x1, y1, z1)
     local p0 = boundless.wrap(boundless.UnwrappedBlockCoord(x0, y0, z0))
@@ -21,14 +23,4 @@ function clearCube(p0, p1)
             end
         end
     end
-end
-
-function workFn()
-    clearCubeXYZ(0, 127, -32, 120, 140, 32)
-    clearCubeXYZ(299, 5, 299, 331, 30, 351)
-    print("Clear cube setup")
-end
-
-function clearTrials()
-    yieldWrapper(workFn, 1, setBatch)
 end

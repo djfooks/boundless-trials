@@ -1,47 +1,12 @@
-
-function stop()
-    for f, _ in boundless.eventListeners(boundless.events.onEnterFrame) do
-        print(boundless.removeEventListener(boundless.events.onEnterFrame, f))
-    end
-    for id, _ in os.intervals() do
-        print(os.clearInterval(id))
-    end
-    for id, _ in os.timeouts() do
-        print(os.clearTimeout(id))
-    end
-end
-stop()
-
-require "trials/sign"
-require "trials/batchblocks"
-require "trials/trialhall"
-require "trials/tiphelper"
-
-function setBlock(p, blockType, meta, color)
-    local c = boundless.ChunkCoord(p)
-    boundless.loadChunkAnd8Neighbours(c, function (chunks)
-        local v = boundless.getBlockValues(p)
-        v.blockType = blockType
-        v.blockMeta = meta
-        v.blockColorIndex = color
-        boundless.setBlockValues(p, v)
-    end)
+require "trials/scripthelpers"
+if not scriptStart(true) then
+    return
 end
 
-function setBlockXYZ(x, y, z, blockType, meta, color)
-    local p = boundless.wrap(boundless.UnwrappedBlockCoord(x, y, z))
-    setBlock(p, blockType, meta, color)
-end
-
-function getBlockType(p)
-    local c = boundless.ChunkCoord(p)
-    local blockType
-    boundless.loadChunkAnd8Neighbours(c, function (chunks)
-        local v = boundless.getBlockValues(boundless.BlockCoord(p))
-        blockType = v.blockType
-    end)
-    return blockType
-end
+scriptRequire("trials/sign")
+scriptRequire("trials/batchblocks")
+scriptRequire("trials/trialhall")
+scriptRequire("trials/tiphelper")
 
 function spawnTree(bx, by, bz)
     print("spawnTree", bx, by, bz)
@@ -110,25 +75,24 @@ function onEnterFrame()
                 e.position = boundless.wrap(boundless.UnwrappedWorldPosition(4, 142, 4))
                 e.facing = math.pi * 0.5
             else
-                updateTrialHall(posUnderFeet)
-
-                blockType = getBlockType(posUnderFeet)
+                local blockTypeUnderFeet = getBlockType(posUnderFeet)
+                updateTrialHall(now, delta, e.position)
 
                 if posUnderFeet.x > 40 then
                     tipComplete(player, "Bridge builder")
                 end
 
-                local rootType = boundless.getBlockTypeData(blockType).rootType
+                local rootType = boundless.getBlockTypeData(blockTypeUnderFeet).rootType
                 if rootType ~= boundless.blockTypes.AIR then
-                    blockType = rootType
+                    blockTypeUnderFeet = rootType
                 end
 
                 if lastBlockType == boundless.blockTypes.AIR then
-                    if blockType == boundless.blockTypes.SOIL_SILTY_BASE_DUGUP then
+                    if blockTypeUnderFeet == boundless.blockTypes.SOIL_SILTY_BASE_DUGUP then
                         print("Trigger tree spawn")
                         trySpawnTree = posUnderFeet
                     end
-                    if blockType == boundless.blockTypes.WOOD_LUSH_LEAVES_DUGUP then
+                    if blockTypeUnderFeet == boundless.blockTypes.WOOD_LUSH_LEAVES_DUGUP then
                         print("Leaves jump")
                         crushingAgainst = getBlockType(posUnderFeet:withYOffset(-1))
                         if crushingAgainst ~= boundless.blockTypes.WOOD_LUSH_LEAVES_DUGUP and

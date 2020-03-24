@@ -1,22 +1,10 @@
-require "trials/batchblocks"
-require "trials/clear"
-require "trials/sign"
-
-function stop()
-    for f, _ in boundless.eventListeners(boundless.events.onEnterFrame) do
-        print(boundless.removeEventListener(boundless.events.onEnterFrame, f))
-    end
-    for id, _ in os.intervals() do
-        print(os.clearInterval(id))
-    end
-    for id, _ in os.timeouts() do
-        print(os.clearTimeout(id))
-    end
-end
-stop()
+require "trials/scripthelpers"
+scriptRequire("trials/batchblocks")
+scriptRequire("trials/clear")
+scriptRequire("trials/sign")
 
 local minerX = 300
-local minerY = 5
+local minerY = 50
 local minerZ = 300
 local minerWidthX = 30
 local minerHeight = 10
@@ -25,8 +13,10 @@ local lavaBorder = 3
 local minerMidX = minerX + minerWidthX * 0.5
 local signP = boundless.UnwrappedBlockCoord(minerMidX, minerY + 8, minerZ + minerWidthZ - 3)
 local signEntityP
-local minerTime = 60
-local startCheckerboardZ = 4
+local minerTime = 10
+local startCheckerboardZ = minerZ + 4
+local finishCheckerboardZ = minerZ + minerWidthZ - 6
+
 function buildMiner(completeFn)
     function workFn()
         -- empty the whole space
@@ -106,16 +96,21 @@ function buildMiner(completeFn)
         cube(minerMidX - 3, minerY, minerZ + 6, minerMidX + 3, minerY + 6,   minerZ + 8, stone2)
         cube(minerMidX - 3, minerY, minerZ + 9, minerMidX + 3, minerY + 3,   minerZ + 11, stone)
 
-        -- checkerboard start line
-        for x=platformX0,platformX1 do
-            for z=minerZ + startCheckerboardZ - 1,minerZ + startCheckerboardZ do
-                if ((x + z) % 2) == 1 then
-                    addBatchBlock(boundless.wrap(boundless.UnwrappedBlockCoord(x, platformTopY, z)), checkerboard1)
-                else
-                    addBatchBlock(boundless.wrap(boundless.UnwrappedBlockCoord(x, platformTopY, z)), checkerboard2)
+        function checkerboard(x0, x1, y, z0)
+            for x=x0,x1 do
+                for z=z0,z0+1 do
+                    if ((x + z) % 2) == 1 then
+                        addBatchBlock(boundless.wrap(boundless.UnwrappedBlockCoord(x, y, z)), checkerboard1)
+                    else
+                        addBatchBlock(boundless.wrap(boundless.UnwrappedBlockCoord(x, y, z)), checkerboard2)
+                    end
                 end
             end
         end
+        -- checkerboard start line
+        checkerboard(platformX0, platformX1, platformTopY, startCheckerboardZ - 1)
+        -- checkerboard finish line
+        checkerboard(minerX + lavaBorder + 1, minerX + minerWidthX - lavaBorder - 1, minerY, finishCheckerboardZ - 1)
 
         -- trial wall
         local wallX0 = minerX + lavaBorder + 1
@@ -149,7 +144,7 @@ function buildMiner(completeFn)
             end
         end
 
-        -- lava
+        -- trial lava
         local numLava = 2 + math.random(2) - 1
         for i=1,numLava do
             local lavaBlockX = wallX0 + math.floor(((wallX1 - wallX0) / (numLava + 1)) * i) + math.random(3) - 1
@@ -157,7 +152,8 @@ function buildMiner(completeFn)
             addBatchBlock(boundless.wrap(boundless.UnwrappedBlockCoord(lavaBlockX, minerY + 6, lavaBlockZ)), lava)
         end
 
-        -- sign gleam
+        -- sign and gleam border
+        signEntityP = addBatchSign(signP, 1, 9, 3, boundless.blockTypes.SIGN_STONE_MODULAR, "Race over here")
         cube(signP.x - 5, signP.y - 1, signP.z + 1, signP.x + 5, signP.y + 3, signP.z + 1, gleam)
     end
     yieldWrapper(workFn, 1, function ()
@@ -167,68 +163,82 @@ end
 
 local minerBuildingComplete
 local minerStarted
+local minerWon
 local minerTimeRemaining
 local minerSecondsDisplayed
-function minerUpdate(now, delta)
-    if minerStarted == false then
-        for c in boundless.connections() do
-            local e = boundless.getEntity(c.id)
-            if e then
-                if e.position.z > minerZ + startCheckerboardZ then
-                    minerTimeRemaining = minerTime
-                    minerSecondsDisplayed = minerTime
-                    minerStarted = true
+function minerUpdate(now, delta, onMinerComplete)
+    local player
+    for c in boundless.connections() do
+        player = boundless.getEntity(c.id)
+    end
 
-                    boundless.getEntity(signEntityP).text = "GO"
-                end
-            end
+    if player == nil then
+        return
+    end
+
+    if minerStarted == false then
+        if minerWon == false and player.position.z > startCheckerboardZ then
+            minerTimeRemaining = minerTime
+            minerSecondsDisplayed = minerTime
+            minerStarted = true
+            boundless.getEntity(signEntityP).text = "GO"
         end
     else
         minerTimeRemaining = minerTimeRemaining - delta
-        local seconds = math.ceil(minerTimeRemaining)
-        if minerSecondsDisplayed > seconds then
-            boundless.getEntity(signEntityP).text = seconds
-            minerSecondsDisplayed = seconds
+        if minerWon == false and minerTimeRemaining <= 0 then
+            boundless.getEntity(signEntityP).text = "TOO SLOW"
+            onMinerComplete(false)
+        elseif minerWon == true or player.position.z > finishCheckerboardZ then
+            minerWon = true
+            boundless.getEntity(signEntityP).text = "WINNER"
+            onMinerComplete(minerWon)
+        else
+            local seconds = math.ceil(minerTimeRemaining)
+            if minerSecondsDisplayed > seconds then
+                boundless.getEntity(signEntityP).text = seconds
+                minerSecondsDisplayed = seconds
+            end
         end
     end
 end
 
 local lastUpdate = os.hrtime()
-function minerOnEnterFrame()
+function minerOnEnterFrame(onMinerComplete)
     local now = os.hrtime()
     local delta = now - lastUpdate
     lastUpdate = now
     if minerBuildingComplete then
-        minerUpdate(now, delta)
+        minerUpdate(now, delta, onMinerComplete)
     end
 end
 
-function loadMiner()
-    minerStarted = false
-    minerBuildingComplete = false
-    local player
+function startMiner()
     for c in boundless.connections() do
         local e = boundless.getEntity(c.id)
         if e then
-            local p = boundless.wrap(boundless.UnwrappedWorldPosition(minerMidX + 0.5, 16, minerZ + 0.6))
+            local p = boundless.wrap(boundless.UnwrappedWorldPosition(minerMidX + 0.5, minerY + 11, minerZ + 0.6))
             e.position = p
-            player = e
 
-            boundless.showPlayerLog(e, "Welcome", "to the boundless miner trial!",
+            boundless.showPlayerLog(e, "Miner Trial", "Cross the start line to begin!",
                     { icon = boundless.guiIcons.boundless,
                       iconColor = boundless.guiColors.boundlessred })
         end
     end
-    addSign(signP, 1, 9, 3, "Building ...")
+end
+
+function loadMiner(completeFn)
+    minerStarted = false
+    minerWon = false
+    minerBuildingComplete = false
     buildMiner(function ()
-        signEntityP = addSign(signP, 1, 9, 3, "Race over here")
         minerBuildingComplete = true
+        completeFn()
     end)
 end
 
 function testMiner()
-    loadMiner()
+    loadMiner(startMiner)
     boundless.addEventListener(boundless.events.onEnterFrame, minerOnEnterFrame)
 end
 
-testMiner()
+-- testMiner()
