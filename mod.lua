@@ -41,21 +41,36 @@ for c in boundless.connections() do
 end
 
 function spawnPlatform(bx, by, bz, blockType, color)
+    local blockValues = boundless.BlockValues(blockType, 0, color, 0)
     for x = -2, 2 do
         for z = -2, 2 do
-            setBlockXYZ(bx + x, by, bz + z, blockType, 0, color)
+            addBatchBlockXYZ(bx + x, by, bz + z, blockValues)
         end
     end
 end
 
-spawnPlatform(40, 128, 4, boundless.blockTypes.ROCK_METAMORPHIC_BASE_DUGUP, 0)
-local chest1Pos = boundless.wrap(boundless.UnwrappedBlockCoord(40, 129, 4))
-setBlock(chest1Pos, boundless.blockTypes.STORAGE_WOOD_PLAIN, 0, 55)
-local chest1Entity = boundless.getEntity(chest1Pos)
-chest1Entity.inventory[1][1] = boundless.Item(boundless.itemTypes.PLACEABLE_WATER, 1, 0)
-chest1Entity.inventory[1][2] = boundless.Item(boundless.itemTypes.PLACEABLE_LAVA, 1, 0)
+local platformsLoaded = false
+function addPlatforms()
+    spawnPlatform(40, 128, 4, boundless.blockTypes.ROCK_METAMORPHIC_BASE_DUGUP, 0)
+    coroutine.yield()
+    spawnTrials()
 
-yieldWrapper(spawnTrials, 1, setBatch)
+    local chest1Pos = boundless.wrap(boundless.UnwrappedBlockCoord(40, 129, 4))
+    local chestBlockValues = boundless.BlockValues(boundless.blockTypes.STORAGE_WOOD_PLAIN, 0, 55, 0)
+    addBatchBlock(chest1Pos, chestBlockValues)
+    addPostFunction(function ()
+        local chest1Entity = boundless.getEntity(chest1Pos)
+        chest1Entity.inventory[1][1] = boundless.Item(boundless.itemTypes.PLACEABLE_WATER, 1, 0)
+        chest1Entity.inventory[1][2] = boundless.Item(boundless.itemTypes.PLACEABLE_LAVA, 1, 0)
+    end)
+end
+
+yieldWrapper(addPlatforms, 1, function ()
+    setBatch(function ()
+        print("Platforms loaded!")
+        platformsLoaded = true
+    end)
+end)
 
 local lastUpdate = os.hrtime()
 function onEnterFrame()
@@ -76,7 +91,9 @@ function onEnterFrame()
                 e.facing = math.pi * 0.5
             else
                 local blockTypeUnderFeet = getBlockType(posUnderFeet)
-                updateTrialHall(now, delta, e.position)
+                if platformsLoaded then
+                    updateTrialHall(now, delta, e.position)
+                end
 
                 if posUnderFeet.x > 40 then
                     tipComplete(player, "Bridge builder")

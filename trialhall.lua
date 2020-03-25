@@ -58,7 +58,6 @@ local trialHall = {
 local trialMap = {}
 function processTrial(sectionId, trialIndex, trialId, trial)
     trial.id = trialId
-    print("trial.id " .. trial.id)
     trial.sectionId = sectionId
     trial.index = trialIndex
     trial.lastDescriptionSignText = ""
@@ -163,7 +162,7 @@ function addSection(id, name, trials, offsetZ)
 
     for id, trial in ipairs(trials) do
         signP = boundless.wrap(boundless.UnwrappedBlockCoord(trialsSectionX + 5 * id - 2, 131, offsetZ + 1))
-        print(trial.id .. " " .. trial.name)
+        -- print(trial.id .. " " .. trial.name)
         addBatchSign(signP, 3, 3, 1, boundless.blockTypes.SIGN_WOOD_MODULAR, trial.name)
         coroutine.yield()
 
@@ -227,14 +226,13 @@ function onMinerComplete(won)
         local e = boundless.getEntity(c.id)
         if e then
             player = e
-            local p = boundless.wrap(boundless.UnwrappedWorldPosition(trialsSectionX + 5 * trial.index - 2, 129, trialHallZ0 + sectionSizeZ * trial.sectionId + 3))
+            local p = boundless.wrap(boundless.UnwrappedWorldPosition(trialsSectionX + 5 * trial.index - 2, 129, trialHallZ0 + sectionSizeZ * (trial.sectionId - 1) + 3))
             player.position = p
         end
     end
 
     if won then
-        local p = boundless.wrap(boundless.UnwrappedBlockCoord(trialsSectionX + 5 * trial.index - 2, 129, trialHallZ0 + sectionSizeZ * trial.sectionId + 2))
-        print(trial.reward[1])
+        local p = boundless.wrap(boundless.UnwrappedBlockCoord(trialsSectionX + 5 * trial.index - 4, 129, trialHallZ0 + sectionSizeZ * (trial.sectionId - 1) + 1))
         setBlock(p, trial.reward[1], 0, 0, 0)
     else
         -- remove all items collected

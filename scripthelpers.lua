@@ -30,7 +30,7 @@ end
 
 function scriptRequire(path)
     requiredModules[path] = true
-    print("Loading " .. path)
+    -- print("Loading " .. path)
     local result = require(path)
     return result
 end

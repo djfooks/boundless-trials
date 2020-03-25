@@ -1,4 +1,7 @@
 require "trials/scripthelpers"
+if not scriptStart(true) then
+    return
+end
 
 scriptRequire("trials/clear")
 

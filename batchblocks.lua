@@ -120,6 +120,7 @@ function setBatch(completeFn)
                         fn()
                         coroutine.yield()
                     end
+                    postFns = {}
                     print("Post functions complete")
                     return
                 end
