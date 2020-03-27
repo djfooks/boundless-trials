@@ -161,19 +161,19 @@ function addSection(id, name, trials, offsetZ)
     coroutine.yield()
 
     for id, trial in ipairs(trials) do
-        signP = boundless.wrap(boundless.UnwrappedBlockCoord(trialsSectionX + 5 * id - 2, 131, offsetZ + 1))
+        signP = boundless.wrap(boundless.UnwrappedBlockCoord(trialsSectionX + 5 * id - 2, 131, offsetZ + sectionSizeZ - 1))
         -- print(trial.id .. " " .. trial.name)
-        addBatchSign(signP, 3, 3, 1, boundless.blockTypes.SIGN_WOOD_MODULAR, trial.name)
+        addBatchSign(signP, 1, 3, 1, boundless.blockTypes.SIGN_WOOD_MODULAR, trial.name)
         coroutine.yield()
 
         trial.descriptionSignPos = signP:withYOffset(-1)
-        addBatchSign(trial.descriptionSignPos, 3, 3, 1, boundless.blockTypes.SIGN_STONE_MODULAR, getTrialDescriptionText(trial, false))
+        addBatchSign(trial.descriptionSignPos, 1, 3, 1, boundless.blockTypes.SIGN_STONE_MODULAR, getTrialDescriptionText(trial, false))
         coroutine.yield()
 
         local starMsg = "1 star " .. trial.star_1_time .. "s\n" ..
                         "2 stars " .. trial.star_2_time .. "s\n" ..
                         "3 stars " .. trial.star_3_time .. "s"
-        trial.starsSign = addBatchSign(signP:withYOffset(-2), 3, 3, 1, boundless.blockTypes.SIGN_WOOD_MODULAR, starMsg)
+        trial.starsSign = addBatchSign(signP:withYOffset(-2), 1, 3, 1, boundless.blockTypes.SIGN_WOOD_MODULAR, starMsg)
         coroutine.yield()
     end
 end
@@ -226,13 +226,13 @@ function onMinerComplete(won)
         local e = boundless.getEntity(c.id)
         if e then
             player = e
-            local p = boundless.wrap(boundless.UnwrappedWorldPosition(trialsSectionX + 5 * trial.index - 2, 129, trialHallZ0 + sectionSizeZ * (trial.sectionId - 1) + 3))
+            local p = boundless.wrap(boundless.UnwrappedWorldPosition(trialsSectionX + 5 * trial.index - 2, 129, trialHallZ0 + sectionSizeZ * (trial.sectionId - 1) + 2))
             player.position = p
         end
     end
 
     if won then
-        local p = boundless.wrap(boundless.UnwrappedBlockCoord(trialsSectionX + 5 * trial.index - 4, 129, trialHallZ0 + sectionSizeZ * (trial.sectionId - 1) + 1))
+        local p = boundless.wrap(boundless.UnwrappedBlockCoord(trialsSectionX + 5 * trial.index - 4, 129, trialHallZ0 + sectionSizeZ * trial.sectionId - 1))
         setBlock(p, trial.reward[1], 0, 0, 0)
     else
         -- remove all items collected
