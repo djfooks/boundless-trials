@@ -61,6 +61,8 @@ function processTrial(sectionId, trialIndex, trialId, trial)
     trial.sectionId = sectionId
     trial.index = trialIndex
     trial.lastDescriptionSignText = ""
+    trial.playBlock = nil
+    trial.isSelected = false
     trialMap[trialId] = trial
 end
 
@@ -95,9 +97,9 @@ function getTrialDescriptionText(trial, active)
 
             local now = os.hrtime()
             if now % 1 < 0.5 then
-                return msg .. "\nJUMP TO PLAY"
+                return msg .. "\nHIT TO PLAY"
             else
-                return msg .. "\n--> JUMP TO PLAY <--"
+                return msg .. "\n--> HIT TO PLAY -->"
             end
         else
             return trial.description
@@ -169,6 +171,9 @@ function addSection(id, name, trials, offsetZ)
         trial.descriptionSignPos = signP:withYOffset(-1)
         addBatchSign(trial.descriptionSignPos, 1, 3, 1, boundless.blockTypes.SIGN_STONE_MODULAR, getTrialDescriptionText(trial, false))
         coroutine.yield()
+
+        trial.playBlock = boundless.wrap(trial.descriptionSignPos - boundless.UnwrappedBlockDelta(2, 0, 0))
+        addBatchBlock(trial.playBlock, boundless.BlockValues(boundless.blockTypes.MANTLE_DEFAULT_BASE, 0, 228, 0))
 
         local starMsg = "1 star " .. trial.star_1_time .. "s\n" ..
                         "2 stars " .. trial.star_2_time .. "s\n" ..
@@ -256,8 +261,17 @@ function updateTrial(now, delta, trial, active, playerPos)
         end
     end
 
+    if trial.isSelected ~= active then
+        trial.isSelected = active
+        local colorIndex = 228
+        if active then
+            colorIndex = 146
+        end
+        setBlock(trial.playBlock, boundless.blockTypes.MANTLE_DEFAULT_BASE, 0, colorIndex)
+    end
+
     if active then
-        if playerPos.y > trialHall0.y + 1.6 then
+        if boundless.getEntity(trial.playBlock, true) then
             if readyTrialId == trial.id then
 
                 local player

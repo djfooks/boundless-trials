@@ -13,7 +13,7 @@ local lavaBorder = 3
 local minerMidX = minerX + minerWidthX * 0.5
 local signP = boundless.UnwrappedBlockCoord(minerMidX, minerY + 8, minerZ + minerWidthZ - 3)
 local signEntityP
-local minerTime = 10
+local minerTime = 50
 local startCheckerboardZ = minerZ + 4
 local finishCheckerboardZ = minerZ + minerWidthZ - 6
 
