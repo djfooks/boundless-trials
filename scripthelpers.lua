@@ -25,6 +25,8 @@ function scriptStart(ignoreMultipleRuns)
         package.loaded[k] = nil
     end
     requiredModules = {}
+
+    print("Script started")
     return true
 end
 

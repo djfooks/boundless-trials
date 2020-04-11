@@ -3,7 +3,7 @@ if not scriptStart(true) then
     return
 end
 
-scriptRequire("trials/clear")
+scriptRequire("trials/batchblocks")
 
 function workFn()
     clearCubeXYZ(0, 127, -32, 120, 140, 32)

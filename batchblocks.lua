@@ -12,6 +12,7 @@ end
 local batchChunks = {}
 local batchBlocksCount = 0
 local postFns = {}
+local addCounter = 0
 
 function addBatchBlock(p, blockValues)
     local chunkCoord = boundless.ChunkCoord(p)
@@ -24,11 +25,40 @@ function addBatchBlock(p, blockValues)
         batchBlocksCount = batchBlocksCount + 1
     end
     blocksMap[blockIndex] = blockValues
+
+    addCounter = addCounter + 1
+    if (addCounter % 512) == 0 then
+        coroutine.yield()
+    end
 end
 
 function addBatchBlockXYZ(x, y, z, blockValues)
     local p = boundless.wrap(boundless.UnwrappedBlockCoord(x, y, z))
     return addBatchBlock(p, blockValues)
+end
+
+function fillCube(p0, p1, blockValues)
+    fillCubeXYZ(p0.x, p0.y, p0.z, p1.x, p1.y, p1.z, blockValues)
+end
+
+function fillCubeXYZ(x0, y0, z0, x1, y1, z1, blockValues)
+    for x=x0,x1 do
+        for y=y0,y1 do
+            for z=z0,z1 do
+                addBatchBlock(boundless.wrap(boundless.UnwrappedBlockCoord(x, y, z)), blockValues)
+            end
+        end
+    end
+end
+
+function clearCube(p0, p1)
+    local air = boundless.BlockValues(boundless.blockTypes.AIR, 0, 0, 0)
+    fillCubeXYZ(p0.x, p0.y, p0.z, p1.x, p1.y, p1.z, air)
+end
+
+function clearCubeXYZ(x0, y0, z0, x1, y1, z1)
+    local air = boundless.BlockValues(boundless.blockTypes.AIR, 0, 0, 0)
+    fillCubeXYZ(x0, y0, z0, x1, y1, z1, air)
 end
 
 function addPostFunction(fn)
@@ -77,7 +107,7 @@ function yieldWaterfall(fnArray, completeFn)
 end
 
 function setBatch(completeFn)
-    print("setBatch")
+    --print("setBatch")
     local blocksSet = 0
     function workFn()
         function peekChunk()
@@ -115,13 +145,13 @@ function setBatch(completeFn)
                 currentChunk = peekChunk()
                 if currentChunk == nil then
                     batchChunks = {}
-                    print("Post functions...")
+                    --print("Post functions...")
                     for i,fn in ipairs(postFns) do
                         fn()
                         coroutine.yield()
                     end
                     postFns = {}
-                    print("Post functions complete")
+                    --print("Post functions complete")
                     return
                 end
                 chunkLocal = boundless.BlockCoord(currentChunk)
@@ -193,7 +223,6 @@ function testBatchBlocks()
                     addBatchBlock(boundless.wrap(p + boundless.UnwrappedBlockDelta(x, y, z)), blockValues)
                 end
             end
-            coroutine.yield()
         end
     end
     yieldWrapper(makeCube, 1, setBatch)

@@ -1,7 +1,12 @@
 require "trials/scripthelpers"
-scriptRequire("trials/miner")
+
+local Miner = require("trials/miner")
 
 local miningHowTo = "Make it to the other side in time\nto keep all the rocks collected"
+
+-- ideas
+--  Mining in the dark (force player to make torches)
+
 
 local trialHall = {
     { name="MINING", trials={
@@ -9,42 +14,45 @@ local trialHall = {
             name="Rock race I",
             description="Smash through the rocks to beat the timer\nContains: Rocks\nReward: Basic Boulder",
             howTo=miningHowTo,
-            resources={
-                { blockType=boundless.blockTypes.ROCK_METAMORPHIC_BASE_DUGUP, weight=1 }
-            },
-            reward={ boundless.blockTypes.ROCK_BOULDER_DUGUP },
+            rewardBlock=boundless.blockTypes.ROCK_BOULDER_DUGUP,
             stars_required=0,
             star_1_time=30,
             star_2_time=25,
-            star_3_time=20
+            star_3_time=20,
+            class=Miner
         },
         {
             name="Rock race II",
             description="Smash through the rocks to beat the timer\nContains: Rocks\nReward: Basic Boulder",
             howTo=miningHowTo,
-            resources={
-                { blockType=boundless.blockTypes.ROCK_METAMORPHIC_BASE_DUGUP, weight=1 },
-                { blockType=boundless.undescribeBlock(
-                    {
-                        blockType=boundless.blockTypes.ROCK_METAMORPHIC_BASE_DUGUP,
-                        embeddedBlockType=boundless.blockTypes.METAL_COPPER_SEAM_DUGUP
-                    }), weight=1 }
-            },
-            reward={ boundless.blockTypes.ROCK_BOULDER_DUGUP },
+            rewardBlock=boundless.blockTypes.ROCK_BOULDER_DUGUP,
             stars_required=0,
             star_1_time=30,
             star_2_time=25,
-            star_3_time=20
+            star_3_time=20,
+            class=Miner
         }
     }},
-    { name="CHALLENGES", trials={} },
+    { name="RACES", trials={
+        {
+            name="Jump Race I",
+            description="Complete the course without falling\nContains: Tech Remnant Seem\nReward: Tech Remnant Seem",
+            howTo=miningHowTo,
+            rewardBlock=boundless.blockTypes.ANCIENTTECHNOLOGY_COMPONENT_SEAM_ROCK_IGNEOUS_BASE,
+            stars_required=0,
+            star_1_time=30,
+            star_2_time=25,
+            star_3_time=20,
+            class=Miner
+        },
+    }},
     { name="FIGHTING", trials={
         {
             name="Wildstock I",
             description="Kill all the Wildstock against the timer\nContains: Wildstock\nReward: Dunno yet...",
             resources={
             },
-            reward={ boundless.blockTypes.ROCK_BOULDER_DUGUP },
+            rewardBlock=boundless.blockTypes.ROCK_BOULDER_DUGUP,
             stars_required=0,
             star_1_time=30,
             star_2_time=25,
@@ -78,6 +86,7 @@ local stars = 0
 local loadingTrialId
 local readyTrialId
 local runningTrialId
+local activeTrial
 function getTrialDescriptionText(trial, active)
     if stars >= trial.stars_required then
         if active then
@@ -99,7 +108,7 @@ function getTrialDescriptionText(trial, active)
             if now % 1 < 0.5 then
                 return msg .. "\nHIT TO PLAY"
             else
-                return msg .. "\n--> HIT TO PLAY -->"
+                return msg .. "\n<-- HIT TO PLAY -->"
             end
         else
             return trial.description
@@ -141,7 +150,6 @@ function addSection(id, name, trials, offsetZ)
                 end
             end
         end
-        coroutine.yield()
     end
 
     for x = trialsSectionX, trialsSectionX + sectionDepth do
@@ -155,31 +163,26 @@ function addSection(id, name, trials, offsetZ)
             -- right wall
             addBatchBlockXYZ(x, y, offsetZ + sectionSizeZ, boundless.BlockValues(blockType, 0, 0, 0))
         end
-        coroutine.yield()
     end
 
     local signP = boundless.wrap(boundless.UnwrappedBlockCoord(trialsSectionX - 1, 132, offsetZ + sectionSizeZ * 0.5))
     addBatchSign(signP, 2, 7, 1, boundless.blockTypes.SIGN_STONE_MODULAR, name)
-    coroutine.yield()
 
     for id, trial in ipairs(trials) do
         signP = boundless.wrap(boundless.UnwrappedBlockCoord(trialsSectionX + 5 * id - 2, 131, offsetZ + sectionSizeZ - 1))
         -- print(trial.id .. " " .. trial.name)
         addBatchSign(signP, 1, 3, 1, boundless.blockTypes.SIGN_WOOD_MODULAR, trial.name)
-        coroutine.yield()
 
         trial.descriptionSignPos = signP:withYOffset(-1)
         addBatchSign(trial.descriptionSignPos, 1, 3, 1, boundless.blockTypes.SIGN_STONE_MODULAR, getTrialDescriptionText(trial, false))
-        coroutine.yield()
 
-        trial.playBlock = boundless.wrap(trial.descriptionSignPos - boundless.UnwrappedBlockDelta(2, 0, 0))
-        addBatchBlock(trial.playBlock, boundless.BlockValues(boundless.blockTypes.MANTLE_DEFAULT_BASE, 0, 228, 0))
+        trial.playBlock1 = boundless.wrap(trial.descriptionSignPos - boundless.UnwrappedBlockDelta(2, 0, -1))
+        trial.playBlock2 = boundless.wrap(trial.descriptionSignPos - boundless.UnwrappedBlockDelta(-2, 0, -1))
 
         local starMsg = "1 star " .. trial.star_1_time .. "s\n" ..
                         "2 stars " .. trial.star_2_time .. "s\n" ..
                         "3 stars " .. trial.star_3_time .. "s"
         trial.starsSign = addBatchSign(signP:withYOffset(-2), 1, 3, 1, boundless.blockTypes.SIGN_WOOD_MODULAR, starMsg)
-        coroutine.yield()
     end
 end
 
@@ -220,8 +223,8 @@ function restoreInventory(src, dst)
 end
 
 local savedInventory = {}
-function onMinerComplete(won)
-    print("onMinerComplete")
+function onTrialComplete(won)
+    print("onTrialComplete")
     local trial = trialMap[runningTrialId]
     runningTrialId = nil
 
@@ -238,20 +241,21 @@ function onMinerComplete(won)
 
     if won then
         local p = boundless.wrap(boundless.UnwrappedBlockCoord(trialsSectionX + 5 * trial.index - 4, 129, trialHallZ0 + sectionSizeZ * trial.sectionId - 1))
-        setBlock(p, trial.reward[1], 0, 0, 0)
+        setBlock(p, trial.rewardBlock, 0, 0, 0)
     else
         -- remove all items collected
-        restoreInventory(savedInventory, player.inventory[1])
+        if activeTrial.restoreInventory then
+            restoreInventory(savedInventory, player.inventory[1])
+        end
     end
+
+    activeTrial = nil
 end
 
-function updateTrial(now, delta, trial, active, playerPos)
-    -- if active then
-    --     print("ACTIVE " .. trial.name)
-    -- else
-    --     print("INACTIVE " .. trial.name)
-    -- end
-
+local playGreen = 146
+local playWhite = 228
+local playColor = playGreen
+function updateTrialInfo(now, delta, trial, active, playerPos)
     local msg = getTrialDescriptionText(trial, active)
     if msg ~= trial.lastDescriptionSignText then
         local signEntity = boundless.getEntity(trial.descriptionSignPos)
@@ -263,17 +267,29 @@ function updateTrial(now, delta, trial, active, playerPos)
 
     if trial.isSelected ~= active then
         trial.isSelected = active
-        local colorIndex = 228
-        if active then
-            colorIndex = 146
+        if not active then
+            setBlock(trial.playBlock1, boundless.blockTypes.WOOD_TWISTED_TRUNK, 0, 0)
+            setBlock(trial.playBlock2, boundless.blockTypes.WOOD_TWISTED_TRUNK, 0, 0)
         end
-        setBlock(trial.playBlock, boundless.blockTypes.MANTLE_DEFAULT_BASE, 0, colorIndex)
     end
 
     if active then
-        if boundless.getEntity(trial.playBlock, true) then
-            if readyTrialId == trial.id then
 
+        local activeColor
+        local now = os.hrtime()
+        if now % 2 < 1.0 then
+            activeColor = playGreen
+        else
+            activeColor = playWhite
+        end
+        if playColor ~= activeColor then
+            playColor = activeColor
+            setBlock(trial.playBlock1, boundless.blockTypes.MANTLE_DEFAULT_BASE, 0, activeColor)
+            setBlock(trial.playBlock2, boundless.blockTypes.MANTLE_DEFAULT_BASE, 0, activeColor)
+        end
+
+        if boundless.getEntity(trial.playBlock1, true) or boundless.getEntity(trial.playBlock2, true) then
+            if readyTrialId == trial.id then
                 local player
                 for c in boundless.connections() do
                     local e = boundless.getEntity(c.id)
@@ -284,10 +300,14 @@ function updateTrial(now, delta, trial, active, playerPos)
                 end
                 readyTrialId = nil
                 runningTrialId = trial.id
-                startMiner()
+                activeTrial.onComplete = onTrialComplete
+                activeTrial:Start()
             elseif loadingTrialId == nil then
                 loadingTrialId = trial.id
-                loadMiner(onTrialLoaded)
+                activeTrial = trial.class:new()
+                activeTrial:Load(onTrialLoaded)
+                setBlock(trial.playBlock1, boundless.blockTypes.AIR, 0, 0)
+                setBlock(trial.playBlock2, boundless.blockTypes.AIR, 0, 0)
             end
         end
     end
@@ -296,7 +316,7 @@ end
 local prevTrial
 function updateTrialHall(now, delta, playerPos)
     if runningTrialId ~= nil then
-        minerOnEnterFrame(onMinerComplete)
+        activeTrial:Update(now, delta)
     elseif trialHall1 ~= nil and
        playerPos.x >= trialHall0.x and playerPos.y >= trialHall0.y and playerPos.z >= trialHall0.z and
        playerPos.x <= trialHall1.x and playerPos.y <= trialHall1.y and playerPos.z <= trialHall1.z then
@@ -307,19 +327,19 @@ function updateTrialHall(now, delta, playerPos)
         local section = trialHall[sectionId]
         local trial = section.trials[trialId]
         if trial ~= nil then
-            updateTrial(now, delta, trial, true, playerPos)
+            updateTrialInfo(now, delta, trial, true, playerPos)
             if prevTrial ~= trial then
                 if prevTrial ~= nil then
-                    updateTrial(now, delta, prevTrial, false, playerPos)
+                    updateTrialInfo(now, delta, prevTrial, false, playerPos)
                 end
                 prevTrial = trial
             end
         elseif prevTrial ~= nil then
-            updateTrial(now, delta, prevTrial, false, playerPos)
+            updateTrialInfo(now, delta, prevTrial, false, playerPos)
             prevTrial = nil
         end
     elseif prevTrial ~= nil then
-        updateTrial(now, delta, prevTrial, false, playerPos)
+        updateTrialInfo(now, delta, prevTrial, false, playerPos)
         prevTrial = nil
     end
 end
