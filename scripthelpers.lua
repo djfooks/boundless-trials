@@ -50,6 +50,14 @@ function setBlock(p, blockType, meta, color)
 end
 
 -- this is slow! only use for small structures <10 blocks
+function setBlockValue(p, blockValue)
+    local c = boundless.ChunkCoord(p)
+    boundless.loadChunkAnd8Neighbours(c, function (chunks)
+        boundless.setBlockValues(p, blockValue)
+    end)
+end
+
+-- this is slow! only use for small structures <10 blocks
 function setBlockXYZ(x, y, z, blockType, meta, color)
     local p = boundless.wrap(boundless.UnwrappedBlockCoord(x, y, z))
     setBlock(p, blockType, meta, color)
