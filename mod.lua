@@ -132,7 +132,7 @@ function onEnterFrame()
                     end
                 end
 
-                lastBlockType = blockType
+                lastBlockType = blockTypeUnderFeet
             end
         end
     end
