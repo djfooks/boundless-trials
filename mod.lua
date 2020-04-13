@@ -8,50 +8,78 @@ scriptRequire("trials/batchblocks")
 scriptRequire("trials/trialhall")
 scriptRequire("trials/tiphelper")
 
-function spawnTree(bx, by, bz)
+local treeLookup = {
+    { soil=boundless.blockTypes.SOIL_SILTY_BASE,
+      soilDugUp=boundless.blockTypes.SOIL_SILTY_BASE_DUGUP,
+      leaves=boundless.blockTypes.WOOD_LUSH_LEAVES,
+      leavesDugUp=boundless.blockTypes.WOOD_LUSH_LEAVES_DUGUP,
+      trunk=boundless.blockTypes.WOOD_ANCIENT_TRUNK },
+
+    { soil=boundless.blockTypes.SOIL_PEATY_BASE,
+      soilDugUp=boundless.blockTypes.SOIL_PEATY_BASE_DUGUP,
+      leaves=boundless.blockTypes.WOOD_WAXY_LEAVES,
+      leavesDugUp=boundless.blockTypes.WOOD_WAXY_LEAVES_DUGUP,
+      trunk=boundless.blockTypes.WOOD_LUSTROUS_TRUNK },
+
+    { soil=boundless.blockTypes.SOIL_CLAY_BASE,
+      soilDugUp=boundless.blockTypes.SOIL_CLAY_BASE_DUGUP,
+      leaves=boundless.blockTypes.WOOD_EXOTIC_LEAVES,
+      leavesDugUp=boundless.blockTypes.WOOD_EXOTIC_LEAVES_DUGUP,
+      trunk=boundless.blockTypes.WOOD_TWISTED_TRUNK },
+}
+function spawnTree(bx, by, bz, soilSource)
+    local leaves = treeLookup[1].leaves
+    local trunk = treeLookup[1].trunk
+    for _, t in ipairs(treeLookup) do
+        if soilSource == t.soil or soilSource == t.soilDugUp then
+            leaves = t.leaves
+            trunk = t.trunk
+        end
+    end
     print("spawnTree", bx, by, bz)
     for x = -1, 1 do
         for y = 4, 7 do
             for z = -1, 1 do
-                setBlockXYZ(bx + x, by + y, bz + z, boundless.blockTypes.WOOD_LUSH_LEAVES, 0, 0)
+                setBlockXYZ(bx + x, by + y, bz + z, leaves, 0, 0)
             end
         end
     end
     for y = 0, 5 do
-        setBlockXYZ(bx, by + y, bz, boundless.blockTypes.WOOD_ANCIENT_TRUNK, 0, 0)
+        setBlockXYZ(bx, by + y, bz, trunk, 0, 0)
     end
 end
 
 setBlockXYZ(4, 128, 4, boundless.blockTypes.SOIL_SILTY_BASE_DUGUP, 0, 0)
-spawnTree(4, 129, 4)
+spawnTree(4, 129, 4, boundless.blockTypes.SOIL_SILTY_BASE_DUGUP)
 
-local player
+local prevPosition
 for c in boundless.connections() do
     local e = boundless.getEntity(c.id)
     if e then
         local p = boundless.wrap(boundless.UnwrappedWorldPosition(4, 142, 4))
         e.position = p
+        prevPosition = p
         e.facing = math.pi * 0.5
 
-        player = e
         boundless.showPlayerLog(e, "Welcome", "to the the boundless trials!",
                 { icon = boundless.guiIcons.boundless,
                   iconColor = boundless.guiColors.boundlessred })
     end
 end
 
-function spawnPlatform(bx, by, bz, blockType, color)
-    local blockValues = boundless.BlockValues(blockType, 0, color, 0)
-    for x = -2, 2 do
-        for z = -2, 2 do
-            addBatchBlockXYZ(bx + x, by, bz + z, blockValues)
-        end
-    end
-end
-
 local platformsLoaded = false
 function addPlatforms()
+    function spawnPlatform(bx, by, bz, blockType, color)
+        local blockValues = boundless.BlockValues(blockType, 0, color, 0)
+        for x = -2, 2 do
+            for z = -2, 2 do
+                addBatchBlockXYZ(bx + x, by, bz + z, blockValues)
+            end
+        end
+    end
     spawnPlatform(40, 128, 4, boundless.blockTypes.ROCK_METAMORPHIC_BASE_DUGUP, 0)
+    addBatchBlockXYZ(40, 128, 5, boundless.BlockValues(boundless.blockTypes.SOIL_CLAY_BASE_DUGUP))
+    addBatchBlockXYZ(40, 128, 3, boundless.BlockValues(boundless.blockTypes.SOIL_PEATY_BASE_DUGUP))
     coroutine.yield()
     spawnTrials()
 
@@ -60,8 +88,8 @@ function addPlatforms()
     addBatchBlock(chest1Pos, chestBlockValues)
     addPostFunction(function ()
         local chest1Entity = boundless.getEntity(chest1Pos)
-        chest1Entity.inventory[1][1] = boundless.Item(boundless.itemTypes.PLACEABLE_WATER, 1, 0)
-        chest1Entity.inventory[1][2] = boundless.Item(boundless.itemTypes.PLACEABLE_LAVA, 1, 0)
+        chest1Entity.inventory[1][1] = boundless.Item(boundless.itemTypes.ITEM_SEED_BERRY, 1, 0)
+        chest1Entity.inventory[1][2] = boundless.Item(boundless.itemTypes.ITEM_SEED_TUBER, 1, 0)
     end)
 end
 
@@ -72,27 +100,32 @@ yieldWrapper(addPlatforms, 1, function ()
     end)
 end)
 
+local trySpawnTree
+local soilSource
 local lastUpdate = os.hrtime()
+local frameDelta = 1/ 16
 function onEnterFrame()
     local now = os.hrtime()
     local delta = now - lastUpdate
     lastUpdate = now
 
-    updateTips(player, delta)
-
     for c in boundless.connections() do
-        local e = boundless.getEntity(c.id)
-        if e then
-            posUnderFeet = e.position:withYOffset(-0.4)
+        local player = boundless.getEntity(c.id)
+        if player then
+            updateTips(player, delta)
+            posUnderFeet = player.position:withYOffset(-0.4)
 
-            if posUnderFeet.y < 28 then
+            local velocity = boundless.distance(player.position, prevPosition) / frameDelta
+            prevPosition = player.position
+
+            if posUnderFeet.y < 28 and velocity < 0.1 then
                 print("Player fall reset!");
-                e.position = boundless.wrap(boundless.UnwrappedWorldPosition(4, 142, 4))
-                e.facing = math.pi * 0.5
+                player.position = boundless.wrap(boundless.UnwrappedWorldPosition(4, 142, 4))
+                player.facing = math.pi * 0.5
             else
                 local blockTypeUnderFeet = getBlockType(posUnderFeet)
                 if platformsLoaded then
-                    updateTrialHall(now, delta, e.position)
+                    updateTrialHall(now, delta, player.position)
                 end
 
                 if posUnderFeet.x > 40 then
@@ -105,18 +138,16 @@ function onEnterFrame()
                 end
 
                 if lastBlockType == boundless.blockTypes.AIR then
-                    if blockTypeUnderFeet == boundless.blockTypes.SOIL_SILTY_BASE_DUGUP then
-                        print("Trigger tree spawn")
-                        trySpawnTree = posUnderFeet
-                    end
-                    if blockTypeUnderFeet == boundless.blockTypes.WOOD_LUSH_LEAVES_DUGUP then
-                        print("Leaves jump")
-                        crushingAgainst = getBlockType(posUnderFeet:withYOffset(-1))
-                        if crushingAgainst ~= boundless.blockTypes.WOOD_LUSH_LEAVES_DUGUP and
-                           crushingAgainst ~= boundless.blockTypes.AIR then
-                            print("Leaves crush")
+                    for _, t in ipairs(treeLookup) do
+                        if blockTypeUnderFeet == t.soil or blockTypeUnderFeet == t.soilDugUp then
+                            print("Trigger tree spawn")
+                            trySpawnTree = posUnderFeet
+                            soilSource = blockTypeUnderFeet
+                        end
+                        if blockTypeUnderFeet == t.leavesDugUp then
+                            print("Leaves jump")
                             tipComplete(player, "Soiled yourself")
-                            setBlock(boundless.BlockCoord(posUnderFeet), boundless.blockTypes.SOIL_SILTY_BASE_DUGUP, 0, 0)
+                            setBlock(boundless.BlockCoord(posUnderFeet), t.soil, 0, 0)
                         end
                     end
                 end
@@ -127,7 +158,7 @@ function onEnterFrame()
                     -- lets the player get away from the tree that is about to spawn
                     if treeX * treeX + treeZ * treeZ > 1.5 then
                         tipComplete(player, "Make a tree")
-                        spawnTree(math.floor(trySpawnTree.x), math.floor(trySpawnTree.y) + 1, math.floor(trySpawnTree.z))
+                        spawnTree(math.floor(trySpawnTree.x), math.floor(trySpawnTree.y) + 1, math.floor(trySpawnTree.z), soilSource)
                         trySpawnTree = nil
                     end
                 end

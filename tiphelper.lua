@@ -2,7 +2,7 @@
 local tips = {
     { name="Make a tree",     description="Try jumping on a soil block!" },
     { name="Bridge builder",  description="Build a bridge to the rock platform!" },
-    { name="Soiled yourself", description="Try crushing leaves against something hard with your feet!" },
+    { name="Soiled yourself", description="Try crushing leaves with your feet!" },
 }
 local tipLookup = {}
 for id = 1,#tips do
